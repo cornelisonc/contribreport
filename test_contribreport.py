@@ -1,5 +1,10 @@
+import io
+import json
 import random
+import subprocess
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from unittest import mock
 
 import contribreport
 
@@ -134,6 +139,89 @@ class BuildReportTest(unittest.TestCase):
         report = contribreport.build_report("owner/repo", [pr(1, "woody", None)])
 
         self.assertEqual(report, {"repository": "owner/repo", "contributors": []})
+
+
+def completed(stdout="", returncode=0):
+    return subprocess.CompletedProcess(args=["gh"], returncode=returncode, stdout=stdout)
+
+
+class FetchPullRequestsTest(unittest.TestCase):
+    @mock.patch("contribreport.subprocess.run")
+    def test_fetch_paginates_closed_pulls_and_parses_each_line(self, run):
+        run.return_value = completed(
+            json.dumps(pr(1, "woody", "2024-01-01T00:00:00Z")) + "\n"
+            + json.dumps(pr(2, "buzz", None)) + "\n"
+        )
+
+        pull_requests = contribreport.fetch_pull_requests("owner/repo")
+
+        self.assertEqual(pull_requests, [pr(1, "woody", "2024-01-01T00:00:00Z"), pr(2, "buzz", None)])
+        command = run.call_args.args[0]
+        self.assertEqual(command[:4], ["gh", "api", "--paginate", "repos/owner/repo/pulls?state=closed&per_page=100"])
+        self.assertEqual(command[4], "--jq")
+
+    @mock.patch("contribreport.subprocess.run")
+    def test_fetch_skips_blank_lines(self, run):
+        run.return_value = completed("\n\n")
+
+        self.assertEqual(contribreport.fetch_pull_requests("owner/repo"), [])
+
+    @mock.patch("contribreport.subprocess.run")
+    def test_fetch_raises_when_gh_fails(self, run):
+        run.return_value = completed(json.dumps(pr(1, "woody", "2024-01-01T00:00:00Z")) + "\n", returncode=1)
+
+        with self.assertRaises(contribreport.GhError):
+            contribreport.fetch_pull_requests("owner/repo")
+
+    @mock.patch("contribreport.subprocess.run", side_effect=FileNotFoundError)
+    def test_fetch_raises_when_gh_is_missing(self, run):
+        with self.assertRaisesRegex(contribreport.GhError, "https://cli.github.com"):
+            contribreport.fetch_pull_requests("owner/repo")
+
+
+class MainTest(unittest.TestCase):
+    def run_main(self, argv):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            code = contribreport.main(argv)
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    @mock.patch("contribreport.fetch_pull_requests")
+    def test_main_prints_report_as_json(self, fetch):
+        pull_requests = [pr(1, "woody", "2024-01-01T00:00:00Z"), pr(2, "buzz", "2024-02-01T00:00:00Z")]
+        fetch.return_value = pull_requests
+
+        code, stdout, _ = self.run_main(["owner/repo"])
+
+        self.assertEqual(code, 0)
+        fetch.assert_called_once_with("owner/repo")
+        self.assertEqual(json.loads(stdout), contribreport.build_report("owner/repo", pull_requests))
+        self.assertTrue(stdout.endswith("}\n"))
+
+    @mock.patch("contribreport.fetch_pull_requests")
+    def test_main_keeps_non_ascii_titles_readable(self, fetch):
+        fetch.return_value = [pr(1, "woody", "2024-01-01T00:00:00Z", title='Corrige "ação" 🎉')]
+
+        _, stdout, _ = self.run_main(["owner/repo"])
+
+        self.assertIn('Corrige \\"ação\\" 🎉', stdout)
+
+    @mock.patch("contribreport.fetch_pull_requests", side_effect=contribreport.GhError("gh exited with status 1"))
+    def test_main_prints_nothing_and_returns_1_when_gh_fails(self, fetch):
+        code, stdout, stderr = self.run_main(["owner/repo"])
+
+        self.assertEqual(code, 1)
+        self.assertEqual(stdout, "")
+        self.assertIn("gh exited with status 1", stderr)
+
+    @mock.patch("contribreport.fetch_pull_requests")
+    def test_main_rejects_malformed_repository(self, fetch):
+        for repository in ["owner", "owner/repo/", "https://github.com/owner/repo", "owner/repo\n"]:
+            with self.subTest(repository=repository):
+                with self.assertRaises(SystemExit) as raised:
+                    self.run_main([repository])
+                self.assertEqual(raised.exception.code, 2)
+        fetch.assert_not_called()
 
 
 if __name__ == "__main__":
