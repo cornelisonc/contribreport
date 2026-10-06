@@ -19,7 +19,6 @@ For example:
 
 ```bash
 python3 contribreport.py LibreSign/libresign > libresign.json
-jq -r '.contributors[] | "\(.first_merged_pr.merged_at)  \(.login)  (\(.merged_pr_count) merged)"' libresign.json
 ```
 
 The report goes to stdout and errors go to stderr. The exit code is `0` on success, `1` if `gh` is missing or fails (in which case nothing is written to stdout, so you never get a partial report), and `2` if the repository isn't in `owner/repo` form.
