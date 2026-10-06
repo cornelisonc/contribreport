@@ -233,6 +233,20 @@ class MainTest(unittest.TestCase):
 
         self.assertIn('Corrige \\"ação\\" 🎉', stdout)
 
+    @mock.patch("contribreport.fetch_pull_requests")
+    def test_main_writes_utf8_with_lf_endings_whatever_the_terminal_encoding(self, fetch):
+        fetch.return_value = [pr(1, "woody", "2024-01-01T00:00:00Z", title="ação 🎉")]
+        raw = io.BytesIO()
+        stdout = io.TextIOWrapper(raw, encoding="cp1252", newline="\r\n")
+
+        with mock.patch.object(contribreport.sys, "stdout", stdout):
+            code = contribreport.main(["owner/repo"])
+            stdout.flush()
+
+        self.assertEqual(code, 0)
+        self.assertNotIn(b"\r", raw.getvalue())
+        self.assertIn("ação 🎉".encode("utf-8"), raw.getvalue())
+
     @mock.patch("contribreport.fetch_pull_requests", side_effect=contribreport.GhError("gh exited with status 1"))
     def test_main_prints_nothing_and_returns_1_when_gh_fails(self, fetch):
         code, stdout, stderr = self.run_main(["owner/repo"])
