@@ -144,6 +144,15 @@ class BuildReportTest(unittest.TestCase):
 
         self.assertEqual(logins(report), ["woody"])
 
+    def test_counts_each_pull_request_once_when_pages_overlap(self):
+        report = contribreport.build_report("owner/repo", [
+            pr(1, "woody", "2024-01-01T00:00:00Z"),
+            pr(2, "woody", "2024-01-02T00:00:00Z"),
+            pr(2, "woody", "2024-01-02T00:00:00Z"),
+        ])
+
+        self.assertEqual(report["contributors"][0]["merged_pr_count"], 2)
+
     def test_no_merged_prs_gives_empty_contributors(self):
         report = contribreport.build_report("owner/repo", [pr(1, "woody", None)])
 
