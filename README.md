@@ -68,7 +68,7 @@ The report goes to stdout and errors go to stderr. The exit code is `0` on succe
 - **Contributor:** the pull request author (`user.login`). Commits, commit emails, merge commits and `Co-authored-by` trailers aren't used.
 - **First / most recent:** the merged pull requests with the earliest and latest `merged_at`. If two were merged in the same second, the lower number counts as earlier.
 - **Bots:** authors whose GitHub account type is `Bot` (for example `dependabot[bot]`) are left out. No other filtering is done.
-- **Deleted accounts:** pull requests whose author no longer exists (GitHub returns no user) are left out, so they don't merge into a single fake contributor.
+- **Deleted accounts:** GitHub shows pull requests from deleted accounts as authored by its placeholder account [`ghost`](https://github.com/ghost). These pull requests are left out, so they don't merge into a single fake contributor.
 - **Order:** contributors are sorted by the date of their first merged pull request, oldest first, then by login.
 - **Read-only:** the only request made is the `GET` above, using your existing `gh` login.
 - **Reproducible:** the output contains nothing run-specific (no timestamps), and records and keys are always in the same order, so the same version of the tool run against the same repository state gives byte-identical output. The output changes when the repository does: newly merged pull requests, edited pull request titles, and renamed or deleted accounts.
