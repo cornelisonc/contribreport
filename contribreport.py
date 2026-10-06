@@ -12,6 +12,7 @@ from urllib.parse import quote_plus
 
 REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 JQ_FILTER = ".[] | {number, title, html_url, merged_at, login: .user.login, type: .user.type}"
+DELETED_ACCOUNT_LOGIN = "ghost"
 
 
 class GhError(Exception):
@@ -44,8 +45,13 @@ def _summarize(pull_request: dict) -> dict:
 
 def build_report(repo: str, pull_requests: list[dict]) -> dict:
     by_author: dict[str, list[dict]] = {}
-    for pull_request in pull_requests:
-        if pull_request["merged_at"] and pull_request["login"] and pull_request["type"] != "Bot":
+    unique_pull_requests = {pull_request["number"]: pull_request for pull_request in pull_requests}
+    for pull_request in unique_pull_requests.values():
+        if (
+            pull_request["merged_at"]
+            and pull_request["login"] not in (None, DELETED_ACCOUNT_LOGIN)
+            and pull_request["type"] != "Bot"
+        ):
             by_author.setdefault(pull_request["login"], []).append(pull_request)
 
     contributors = []

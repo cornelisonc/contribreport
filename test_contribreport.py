@@ -135,6 +135,15 @@ class BuildReportTest(unittest.TestCase):
 
         self.assertEqual(contribreport.build_report("owner/repo", shuffled), expected)
 
+    def test_excludes_ghost_placeholder_for_deleted_accounts(self):
+        report = contribreport.build_report("owner/repo", [
+            pr(1, "ghost", "2024-01-01T00:00:00Z"),
+            pr(2, "ghost", "2024-01-02T00:00:00Z"),
+            pr(3, "woody", "2024-01-03T00:00:00Z"),
+        ])
+
+        self.assertEqual(logins(report), ["woody"])
+
     def test_no_merged_prs_gives_empty_contributors(self):
         report = contribreport.build_report("owner/repo", [pr(1, "woody", None)])
 
