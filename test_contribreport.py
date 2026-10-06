@@ -170,6 +170,15 @@ class FetchPullRequestsTest(unittest.TestCase):
         self.assertEqual(command[4], "--jq")
 
     @mock.patch("contribreport.subprocess.run")
+    def test_fetch_asks_gh_for_one_compact_json_string_per_pull_request(self, run):
+        run.return_value = completed()
+
+        contribreport.fetch_pull_requests("owner/repo")
+
+        jq_filter = run.call_args.args[0][5]
+        self.assertTrue(jq_filter.endswith("| tojson"), jq_filter)
+
+    @mock.patch("contribreport.subprocess.run")
     def test_fetch_skips_blank_lines(self, run):
         run.return_value = completed("\n\n")
 

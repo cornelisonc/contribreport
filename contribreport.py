@@ -11,7 +11,7 @@ import sys
 from urllib.parse import quote_plus
 
 REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-JQ_FILTER = ".[] | {number, title, html_url, merged_at, login: .user.login, type: .user.type}"
+JQ_FILTER = ".[] | {number, title, html_url, merged_at, login: .user.login, type: .user.type} | tojson"
 DELETED_ACCOUNT_LOGIN = "ghost"
 
 
